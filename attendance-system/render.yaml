@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: attendance-system
+    env: node
+    region: oregon
+    branch: main
+    plan: free
+    buildCommand: bash -lc "cd backend && npm install"
+    startCommand: bash -lc "cd backend && node server.js"
+    autoDeploy: true
