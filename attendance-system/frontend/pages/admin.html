@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Attendance Register</title>
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div class="brand"><span class="mark"></span> Attendance Register</div>
+    <div class="who" id="topbar-who"></div>
+  </div>
+
+  <div class="main">
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="overview">Overview</div>
+        <div class="tab" data-tab="classes">Classes</div>
+        <div class="tab" data-tab="students">Students &amp; QR</div>
+        <div class="tab" data-tab="reports">Reports</div>
+        <div class="tab admin-only hidden" data-tab="teachers">Teachers</div>
+      </div>
+      <a href="scan.html" class="btn brass small">▸ Open Scan Station</a>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="tab-panel" id="panel-overview">
+      <div class="grid-3" id="stat-cards">
+        <div class="stat"><div class="num" id="stat-classes">–</div><div class="lbl">Classes</div></div>
+        <div class="stat"><div class="num" id="stat-students">–</div><div class="lbl">Students</div></div>
+        <div class="stat"><div class="num" id="stat-today">–</div><div class="lbl">Marked present today</div></div>
+      </div>
+      <div class="panel brass-edge" style="margin-top:24px">
+        <h2>How this works</h2>
+        <p class="eyebrow">Quick guide</p>
+        <ol style="font-size:14px; line-height:1.9; color:var(--ink-soft); padding-left:20px;">
+          <li>Create a <strong>class</strong> and assign a teacher.</li>
+          <li>Add <strong>students</strong> to the class — each gets a unique QR code automatically.</li>
+          <li>Print or share each student's QR (their digital/physical ID card).</li>
+          <li>Open the <strong>Scan Station</strong> during class — students scan in and are marked present instantly.</li>
+          <li>Check <strong>Reports</strong> for attendance percentage and defaulters (below 75%).</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CLASSES -->
+    <div class="tab-panel hidden" id="panel-classes">
+      <div class="grid-2">
+        <div class="panel">
+          <h2>All Classes</h2>
+          <p class="eyebrow">Class · Section · Teacher · Roll strength</p>
+          <table class="ledger" id="classes-table">
+            <thead><tr><th>Class</th><th>Section</th><th>Teacher</th><th class="mono">Students</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="panel brass-edge admin-only hidden">
+          <h2>Add Class</h2>
+          <p class="eyebrow">Admin only</p>
+          <form id="class-form">
+            <label>Class name</label>
+            <input type="text" id="c-name" placeholder="e.g. 10th Grade" required />
+            <label>Section</label>
+            <input type="text" id="c-section" placeholder="e.g. A" required />
+            <label>Assign teacher (optional)</label>
+            <select id="c-teacher"><option value="">— none —</option></select>
+            <button class="btn brass" type="submit">Add Class</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- STUDENTS -->
+    <div class="tab-panel hidden" id="panel-students">
+      <div class="panel">
+        <div class="field-row">
+          <div>
+            <label>Select class</label>
+            <select id="student-class-select"></select>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <h2>Roster</h2>
+          <p class="eyebrow">Tap a QR button to view / print the student's code</p>
+          <table class="ledger" id="students-table">
+            <thead><tr><th class="mono">Roll</th><th>Name</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="panel brass-edge admin-only hidden">
+          <h2>Add Student</h2>
+          <p class="eyebrow">Auto-generates a unique QR code</p>
+          <form id="student-form">
+            <label>Roll number</label>
+            <input type="text" id="s-roll" required />
+            <label>Full name</label>
+            <input type="text" id="s-name" required />
+            <label>Email (optional)</label>
+            <input type="email" id="s-email" />
+            <button class="btn brass" type="submit">Add Student</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="tab-panel hidden" id="panel-reports">
+      <div class="panel">
+        <div class="field-row">
+          <div>
+            <label>Class</label>
+            <select id="report-class-select"></select>
+          </div>
+          <div>
+            <label>From</label>
+            <input type="date" id="report-from" />
+          </div>
+          <div>
+            <label>To</label>
+            <input type="date" id="report-to" />
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:10px; padding-bottom:18px;">
+            <button class="btn outline small" id="run-report">Run Report</button>
+            <button class="btn brass small" id="export-csv">Export CSV</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="report-panel-wrap" style="display:none;">
+        <h2>Attendance Report</h2>
+        <p class="eyebrow" id="report-summary"></p>
+        <table class="ledger" id="report-table">
+          <thead><tr><th class="mono">Roll</th><th>Name</th><th class="mono">Attended</th><th class="mono">%</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TEACHERS (admin only) -->
+    <div class="tab-panel hidden" id="panel-teachers">
+      <div class="grid-2">
+        <div class="panel">
+          <h2>Teacher Accounts</h2>
+          <table class="ledger" id="teachers-table">
+            <thead><tr><th>Name</th><th>Email</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="panel brass-edge">
+          <h2>Add Teacher</h2>
+          <form id="teacher-form">
+            <label>Name</label>
+            <input type="text" id="t-name" required />
+            <label>Email</label>
+            <input type="email" id="t-email" required />
+            <label>Temporary password</label>
+            <input type="text" id="t-password" required />
+            <button class="btn brass" type="submit">Create Account</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QR modal -->
+<div id="qr-modal" class="hidden" style="position:fixed; inset:0; background:rgba(28,52,48,0.7); display:flex; align-items:center; justify-content:center; z-index:100;">
+  <div style="background:var(--white); padding:28px; border-radius:6px; text-align:center; width:320px;">
+    <h2 style="margin-top:0; font-family:var(--font-display); color:var(--board);" id="qr-modal-name"></h2>
+    <p class="eyebrow mono" id="qr-modal-roll"></p>
+    <img id="qr-modal-img" style="width:220px; height:220px; margin:10px 0;" />
+    <div style="display:flex; gap:10px; margin-top:12px;">
+      <button class="btn outline small" onclick="window.print()">Print</button>
+      <button class="btn small" onclick="document.getElementById('qr-modal').classList.add('hidden')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scan Station — Attendance Register</title>
+<link rel="stylesheet" href="../css/style.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div class="brand"><span class="mark"></span> Attendance Register</div>
+    <div class="who" id="topbar-who"></div>
+  </div>
+
+  <div class="main">
+    <div class="toolbar">
+      <a href="admin.html" class="btn outline small">◂ Back to Dashboard</a>
+    </div>
+
+    <div class="scan-wrap">
+      <div class="panel brass-edge" style="text-align:left;">
+        <h2>1. Open a session</h2>
+        <p class="eyebrow">Pick the class and period you're taking attendance for</p>
+        <div class="field-row">
+          <div>
+            <label>Class</label>
+            <select id="scan-class-select"></select>
+          </div>
+          <div>
+            <label>Date</label>
+            <input type="date" id="scan-date" />
+          </div>
+          <div>
+            <label>Period</label>
+            <input type="text" id="scan-period" value="General" />
+          </div>
+        </div>
+        <button class="btn brass" id="open-session-btn">Open Session &amp; Start Scanning</button>
+      </div>
+
+      <div id="scan-active" class="hidden">
+        <p class="eyebrow" style="margin-top:28px;">2. Point camera at each student's QR code</p>
+        <div class="scan-frame"><div id="reader"></div></div>
+
+        <div id="stamp-area"></div>
+
+        <div class="tally-list" id="tally-list"></div>
+
+        <div style="margin-top:16px;">
+          <div class="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+          <p class="eyebrow" id="progress-label" style="margin-top:8px;"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+requireAuth();
+renderTopbar();
+document.getElementById('scan-date').value = new Date().toISOString().slice(0, 10);
+
+let currentSession = null;
+let html5QrCode = null;
+let scannedIds = new Set();
+let classTotal = 0;
+
+async function init() {
+  const classes = await api('/classes');
+  const sel = document.getElementById('scan-class-select');
+  sel.innerHTML = '';
+  if (classes.length === 0) {
+    sel.innerHTML = '<option value="">No classes assigned to you</option>';
+    return;
+  }
+  classes.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.dataset.total = c.student_count;
+    opt.textContent = `${c.name} - ${c.section} (${c.student_count} students)`;
+    sel.appendChild(opt);
+  });
+}
+init();
+
+document.getElementById('open-session-btn').addEventListener('click', async () => {
+  const classSel = document.getElementById('scan-class-select');
+  const classId = classSel.value;
+  if (!classId) { alert('Select a class'); return; }
+  classTotal = Number(classSel.selectedOptions[0].dataset.total || 0);
+
+  const session_date = document.getElementById('scan-date').value;
+  const period_name = document.getElementById('scan-period').value.trim() || 'General';
+
+  try {
+    currentSession = await api('/attendance/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ class_id: Number(classId), session_date, period_name })
+    });
+    scannedIds = new Set();
+    document.getElementById('scan-active').classList.remove('hidden');
+    document.getElementById('tally-list').innerHTML = '';
+    updateProgress();
+    startScanner();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+function startScanner() {
+  if (html5QrCode) { html5QrCode.stop().catch(() => {}); }
+  html5QrCode = new Html5Qrcode('reader');
+  const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+
+  html5QrCode.start({ facingMode: 'environment' }, config, onScanSuccess, () => {})
+    .catch(() => {
+      // fallback to front camera (e.g. laptop webcam)
+      html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, () => {}).catch(err => {
+        showStamp('error', 'Could not access camera: ' + err);
+      });
+    });
+}
+
+let scanLocked = false;
+async function onScanSuccess(decodedText) {
+  if (scanLocked) return;
+  scanLocked = true;
+  setTimeout(() => { scanLocked = false; }, 1200); // debounce rapid repeat reads
+
+  try {
+    const result = await api('/attendance/scan', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: currentSession.id, qr_token: decodedText })
+    });
+    if (result.status === 'marked') {
+      showStamp('marked', `✓ ${result.student.name} — Present`);
+      addTallyRow(result.student.name, result.student.roll_no);
+      scannedIds.add(result.student.id);
+    } else if (result.status === 'duplicate') {
+      showStamp('duplicate', `Already marked — ${result.student.name}`);
+    }
+    updateProgress();
+  } catch (err) {
+    showStamp('error', err.message);
+  }
+}
+
+function showStamp(type, text) {
+  const area = document.getElementById('stamp-area');
+  area.innerHTML = `<div class="stamp ${type}">${text}</div>`;
+  setTimeout(() => { area.innerHTML = ''; }, 1800);
+}
+
+function addTallyRow(name, roll) {
+  const list = document.getElementById('tally-list');
+  const row = document.createElement('div');
+  row.className = 'tally-row';
+  const time = new Date().toLocaleTimeString();
+  row.innerHTML = `<span class="t-name">${name} <span style="color:var(--ink-soft)">· Roll ${roll}</span></span><span class="t-time">${time}</span>`;
+  list.prepend(row);
+}
+
+function updateProgress() {
+  const pct = classTotal > 0 ? Math.round((scannedIds.size / classTotal) * 100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${scannedIds.size} of ${classTotal} students marked present (${pct}%)`;
+}
+</script>
+</body>
+</html>
