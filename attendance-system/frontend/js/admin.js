@@ -135,7 +135,12 @@ async function loadStudents() {
     tr.innerHTML = `
       <td class="mono">${s.roll_no}</td>
       <td>${s.name}</td>
-      <td><button class="btn outline small" onclick="showQr(${s.id})">View QR</button></td>
+      <td>${s.email || '<span style="color:var(--ink-soft)">—</span>'}</td>
+      <td>${s.phone || '<span style="color:var(--ink-soft)">—</span>'}</td>
+      <td>
+        <button class="btn outline small" onclick="showQr(${s.id})">View QR</button>
+        <button class="btn danger small" onclick="deleteStudent(${s.id})">Delete</button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -148,8 +153,12 @@ document.getElementById('student-form') && document.getElementById('student-form
   const roll_no = document.getElementById('s-roll').value.trim();
   const name = document.getElementById('s-name').value.trim();
   const email = document.getElementById('s-email').value.trim();
+  const phone = document.getElementById('s-phone').value.trim();
   try {
-    await api('/students', { method: 'POST', body: JSON.stringify({ roll_no, name, class_id: Number(classId), email }) });
+    await api('/students', {
+      method: 'POST',
+      body: JSON.stringify({ roll_no, name, class_id: Number(classId), email, phone })
+    });
     e.target.reset();
     loadStudents();
     loadOverview();
@@ -162,6 +171,13 @@ async function showQr(studentId) {
   document.getElementById('qr-modal-roll').textContent = `Roll No. ${data.roll_no}`;
   document.getElementById('qr-modal-img').src = data.qrImage;
   document.getElementById('qr-modal').classList.remove('hidden');
+}
+
+async function deleteStudent(studentId) {
+  if (!confirm('Delete this student and all related attendance records?')) return;
+  await api(`/students/${studentId}`, { method: 'DELETE' });
+  loadStudents();
+  loadOverview();
 }
 
 // ---------- Reports ----------
@@ -207,14 +223,25 @@ document.getElementById('export-csv').addEventListener('click', () => {
   if (from && to) url += `&from=${from}&to=${to}`;
   fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } })
     .then(res => {
-      if (!res.ok) return res.json().then(d => { throw new Error(d.error); });
+      if (!res.ok) return res.text().then(text => {
+        try {
+          const d = JSON.parse(text);
+          throw new Error(d.error || text);
+        } catch {
+          throw new Error(text || 'Failed to export CSV');
+        }
+      });
       return res.blob();
     })
     .then(blob => {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `attendance_class_${classId}.csv`;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     })
     .catch(err => alert(err.message));
 });

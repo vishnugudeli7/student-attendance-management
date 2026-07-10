@@ -30,13 +30,9 @@ router.get('/attendance-csv', (req, res) => {
     ORDER BY st.roll_no, s.session_date
   `).all(...params, class_id);
 
-  if (rows.length === 0) {
-    return res.status(404).json({ error: 'No attendance data found for this class/date range' });
-  }
-
   const fields = ['roll_no', 'name', 'session_date', 'period_name', 'status', 'scanned_at'];
   const parser = new Parser({ fields });
-  const csv = parser.parse(rows);
+  const csv = rows.length === 0 ? fields.join(',') : parser.parse(rows);
 
   res.header('Content-Type', 'text/csv');
   res.attachment(`attendance_class_${class_id}.csv`);

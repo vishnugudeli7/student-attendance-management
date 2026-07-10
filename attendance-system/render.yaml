@@ -5,6 +5,10 @@ services:
     region: oregon
     branch: main
     plan: free
-    buildCommand: bash -lc "cd backend && npm install"
-    startCommand: bash -lc "cd backend && node server.js"
+    # Robust build/start commands that handle repos where `backend` may be
+    # at the repo root or inside an enclosing folder like `attendance-system`.
+    buildCommand: >-
+      bash -lc "if [ -d backend ]; then cd backend; elif [ -d attendance-system/backend ]; then cd attendance-system/backend; else echo 'backend directory not found' && exit 1; fi && npm install"
+    startCommand: >-
+      bash -lc "if [ -d backend ]; then cd backend; elif [ -d attendance-system/backend ]; then cd attendance-system/backend; else echo 'backend directory not found' && exit 1; fi && node server.js"
     autoDeploy: true
